@@ -151,7 +151,7 @@ export default function App() {
   // Helper to load records for a specific user ID
   const getUserRecords = useCallback(
     (userId: string): InBodyRecord[] => {
-      if (allRecordsMap[userId] && allRecordsMap[userId].length > 0) {
+      if (allRecordsMap[userId] !== undefined) {
         return allRecordsMap[userId];
       }
       const saved = localStorage.getItem(`${STORAGE_KEY_USER_RECORDS_PREFIX}${userId}`);
