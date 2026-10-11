@@ -14,7 +14,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { getAuth, Auth } from 'firebase/auth';
-import firebaseConfig from '../../firebase-applet-config.json';
+import { getResolvedFirebaseConfig } from './firebaseConfig';
 import { UserAccount, InBodyRecord } from '../types';
 import { DEFAULT_ACCOUNTS, INITIAL_INBODY_RECORDS, INITIAL_LEE_RECORDS } from '../data/initialData';
 
@@ -24,6 +24,9 @@ export const RECORDS_COLLECTION = 'records';
 
 export const isFirebaseConfigured = true;
 export const isCloudSynced = true;
+
+// Resolved Firebase configuration (supports Vercel env vars & embedded provisioned config)
+export const firebaseConfig = getResolvedFirebaseConfig();
 
 // Initialize Firebase App and Firestore using provisioned database
 let app: FirebaseApp;
