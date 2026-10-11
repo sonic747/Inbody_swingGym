@@ -1,7 +1,9 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
+import { DEFAULT_ACCOUNTS, INITIAL_INBODY_RECORDS, INITIAL_LEE_RECORDS } from './src/data/initialData';
 
 async function startServer() {
   const app = express();
@@ -24,6 +26,226 @@ async function startServer() {
   // API Route: Health check
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', service: 'SwingGym InBody Analytics API' });
+  });
+
+  // ==========================================
+  // REAL-TIME CLOUD DATA SYNCHRONIZATION ENGINE
+  // (PC ↔ Smartphone Real-Time Instant Sync)
+  // ==========================================
+  const DATA_DIR = path.join(process.cwd(), 'data');
+  const DB_FILE = path.join(DATA_DIR, 'inbody-database.json');
+
+  interface InBodyDatabase {
+    version: number;
+    lastUpdated: string;
+    accounts: any[];
+    recordsMap: Record<string, any[]>;
+  }
+
+  function loadDatabase(): InBodyDatabase {
+    try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      if (fs.existsSync(DB_FILE)) {
+        const raw = fs.readFileSync(DB_FILE, 'utf-8');
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.accounts) && parsed.recordsMap) {
+          return parsed;
+        }
+      }
+    } catch (err) {
+      console.warn('[Sync DB] Failed reading db file, falling back to defaults:', err);
+    }
+
+    const initialDb: InBodyDatabase = {
+      version: 1,
+      lastUpdated: new Date().toISOString(),
+      accounts: DEFAULT_ACCOUNTS,
+      recordsMap: {
+        user_demo: INITIAL_INBODY_RECORDS,
+        user_lee: INITIAL_LEE_RECORDS,
+      },
+    };
+
+    try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      fs.writeFileSync(DB_FILE, JSON.stringify(initialDb, null, 2), 'utf-8');
+    } catch (err) {
+      console.warn('[Sync DB] Failed writing initial db file:', err);
+    }
+    return initialDb;
+  }
+
+  const currentDb: InBodyDatabase = loadDatabase();
+
+  function saveDatabase() {
+    currentDb.lastUpdated = new Date().toISOString();
+    currentDb.version = (currentDb.version || 1) + 1;
+    try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      fs.writeFileSync(DB_FILE, JSON.stringify(currentDb, null, 2), 'utf-8');
+    } catch (err) {
+      console.error('[Sync DB] Error writing database to disk:', err);
+    }
+  }
+
+  // Active SSE Clients for real-time push to all PCs, smartphones, and tablets
+  const sseClients = new Set<express.Response>();
+
+  function broadcastSync(eventType: string, data: any) {
+    const payload = JSON.stringify(data);
+    const message = `event: ${eventType}\ndata: ${payload}\n\n`;
+    for (const client of sseClients) {
+      try {
+        client.write(message);
+      } catch {
+        sseClients.delete(client);
+      }
+    }
+  }
+
+  // Send heartbeat ping every 15s to keep connections alive across mobile Safari/Chrome & Cloud Run
+  setInterval(() => {
+    for (const client of sseClients) {
+      try {
+        client.write(': heartbeat\n\n');
+      } catch {
+        sseClients.delete(client);
+      }
+    }
+  }, 15000);
+
+  // SSE Stream endpoint
+  app.get('/api/sync/events', (req, res) => {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
+      'Access-Control-Allow-Origin': '*',
+    });
+
+    // Send immediate initial state
+    res.write(
+      `event: init\ndata: ${JSON.stringify({
+        accounts: currentDb.accounts,
+        recordsMap: currentDb.recordsMap,
+        version: currentDb.version,
+      })}\n\n`
+    );
+
+    sseClients.add(res);
+    console.log(`[Sync SSE] Client connected (${sseClients.size} total active clients)`);
+
+    req.on('close', () => {
+      sseClients.delete(res);
+      console.log(`[Sync SSE] Client disconnected (${sseClients.size} active clients remaining)`);
+    });
+  });
+
+  // Full data fetch
+  app.get('/api/sync/data', (req, res) => {
+    res.json({
+      success: true,
+      accounts: currentDb.accounts,
+      recordsMap: currentDb.recordsMap,
+      version: currentDb.version,
+      lastUpdated: currentDb.lastUpdated,
+    });
+  });
+
+  // Save / Update Account (Broadcasts to all connected phones/PCs immediately)
+  app.post('/api/sync/accounts', (req, res) => {
+    const account = req.body;
+    if (!account || !account.id) {
+      return res.status(400).json({ error: '유효한 계정 데이터가 필요합니다.' });
+    }
+
+    const existingIndex = currentDb.accounts.findIndex((a) => a.id === account.id);
+    if (existingIndex >= 0) {
+      currentDb.accounts[existingIndex] = { ...currentDb.accounts[existingIndex], ...account };
+    } else {
+      currentDb.accounts.push(account);
+    }
+
+    saveDatabase();
+    broadcastSync('sync_accounts', { account, accounts: currentDb.accounts });
+    console.log(`[Sync] Account saved & pushed to all devices: ${account.name} (ID: ${account.username})`);
+    res.json({ success: true, account, accounts: currentDb.accounts });
+  });
+
+  // Delete Account
+  app.delete('/api/sync/accounts/:id', (req, res) => {
+    const { id } = req.params;
+    currentDb.accounts = currentDb.accounts.filter((a) => a.id !== id);
+    if (currentDb.recordsMap[id]) {
+      delete currentDb.recordsMap[id];
+    }
+    saveDatabase();
+    broadcastSync('sync_accounts', { deletedId: id, accounts: currentDb.accounts });
+    broadcastSync('sync_records', { recordsMap: currentDb.recordsMap });
+    console.log(`[Sync] Account deleted & pushed to all devices: ${id}`);
+    res.json({ success: true, accounts: currentDb.accounts });
+  });
+
+  // Save / Update InBody Record (Broadcasts to all phones/PCs immediately)
+  app.post('/api/sync/records', (req, res) => {
+    const { record, userId } = req.body;
+    if (!record || !record.id || !userId) {
+      return res.status(400).json({ error: '유효한 기록 및 userId 데이터가 필요합니다.' });
+    }
+
+    if (!currentDb.recordsMap[userId]) {
+      currentDb.recordsMap[userId] = [];
+    }
+
+    const existingIndex = currentDb.recordsMap[userId].findIndex((r) => r.id === record.id);
+    if (existingIndex >= 0) {
+      currentDb.recordsMap[userId][existingIndex] = record;
+    } else {
+      currentDb.recordsMap[userId].unshift(record);
+    }
+
+    // Sort descending by date
+    currentDb.recordsMap[userId].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+
+    saveDatabase();
+    broadcastSync('sync_records', { userId, record, recordsMap: currentDb.recordsMap });
+    console.log(`[Sync] InBody record saved & pushed for ${userId} (${record.weight}kg)`);
+    res.json({ success: true, recordsMap: currentDb.recordsMap });
+  });
+
+  // Delete InBody Record
+  app.delete('/api/sync/records/:id', (req, res) => {
+    const { id } = req.params;
+    for (const uid of Object.keys(currentDb.recordsMap)) {
+      currentDb.recordsMap[uid] = currentDb.recordsMap[uid].filter((r) => r.id !== id);
+    }
+    saveDatabase();
+    broadcastSync('sync_records', { deletedId: id, recordsMap: currentDb.recordsMap });
+    res.json({ success: true, recordsMap: currentDb.recordsMap });
+  });
+
+  // Full Restore
+  app.post('/api/sync/restore', (req, res) => {
+    const { accounts, recordsByUser } = req.body;
+    if (Array.isArray(accounts)) {
+      currentDb.accounts = accounts;
+    }
+    if (recordsByUser && typeof recordsByUser === 'object') {
+      currentDb.recordsMap = recordsByUser;
+    }
+    saveDatabase();
+    broadcastSync('full_sync', { accounts: currentDb.accounts, recordsMap: currentDb.recordsMap });
+    console.log(`[Sync] Full database restored & broadcasted: ${currentDb.accounts.length} accounts`);
+    res.json({ success: true, accounts: currentDb.accounts, recordsMap: currentDb.recordsMap });
   });
 
   // API Route: Analyze InBody Image using Gemini Vision OCR (support both POST and OPTIONS safely)

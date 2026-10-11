@@ -569,7 +569,6 @@ export default function App() {
           activeTab={activeTab}
           onChangeTab={setActiveTab}
           isCloudSynced={isFirebaseConfigured}
-          onOpenInstallModal={() => setIsInstallModalOpen(true)}
           title={
             isAdmin
               ? activeTab === 'admin_members'

@@ -13,7 +13,6 @@ interface HeaderProps {
   activeTab?: ActiveTab;
   onChangeTab?: (tab: ActiveTab) => void;
   isCloudSynced?: boolean;
-  onOpenInstallModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -28,7 +27,6 @@ export const Header: React.FC<HeaderProps> = ({
   activeTab = 'home',
   onChangeTab,
   isCloudSynced = true,
-  onOpenInstallModal,
 }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -65,8 +63,8 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="sticky top-0 bg-[#0D0F16]/95 backdrop-blur-md border-b border-[#2A2D35] flex flex-col w-full z-40">
       <div className="flex justify-between items-center w-full px-4 sm:px-6 py-2.5 h-16">
-        <div className="flex items-center gap-3 sm:gap-4">
-          <div className="flex items-center gap-2.5 sm:gap-3">
+        <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <div className="w-8 h-8 rounded-full overflow-hidden bg-[#1A1D26] flex items-center justify-center ring-1 ring-[#3B82F6]/40 shrink-0">
               <img
                 className="w-full h-full object-cover"
@@ -75,9 +73,9 @@ export const Header: React.FC<HeaderProps> = ({
                 referrerPolicy="no-referrer"
               />
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-gradient-to-tr from-[#3B82F6] to-[#8B5CF6] shadow-sm shadow-blue-500/50"></div>
-              <h1 className="text-base sm:text-xl font-bold text-[#E2E4E9] tracking-tight">
+            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+              <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-gradient-to-tr from-[#3B82F6] to-[#8B5CF6] shadow-sm shadow-blue-500/50 shrink-0"></div>
+              <h1 className="text-sm sm:text-base md:text-xl font-bold text-[#E2E4E9] tracking-tight truncate">
                 {title}
               </h1>
             </div>
@@ -108,66 +106,28 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Right Side: User & Admin Status */}
-        <div className="flex items-center gap-2">
-          {/* Cloud Sync or Local Storage Status Pill */}
-          {isCloudSynced ? (
-            <div
-              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-[11px] font-semibold text-emerald-400"
-              title="모든 기기(PC, 모바일, 태블릿)와 실시간 클라우드 동기화 중"
-            >
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span className="material-symbols-outlined text-[14px]">cloud_done</span>
-              <span className="hidden md:inline">클라우드 동기화</span>
-            </div>
-          ) : (
-            <div
-              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-blue-500/10 border border-blue-500/25 text-[11px] font-semibold text-blue-400"
-              title="로컬 저장소(브라우저) 안전 보관 모드 동작 중 (언제든 데이터 백업/복원 가능)"
-            >
-              <span className="material-symbols-outlined text-[14px]">save</span>
-              <span className="hidden md:inline">로컬 보관 모드</span>
-            </div>
-          )}
-
-          {/* Shortcut / Install App Button */}
-          {onOpenInstallModal && (
-            <button
-              onClick={onOpenInstallModal}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#1E2433] hover:bg-[#283145] border border-[#3B82F6]/30 text-[11px] font-semibold text-[#93C5FD] transition-all shadow-sm group active:scale-95"
-              title="PC 크롬, 스마트폰(아이폰 사파리 / 갤럭시 크롬) 단축 아이콘 등록 및 앱 설치"
-            >
-              <span className="material-symbols-outlined text-[15px] text-[#38BDF8] group-hover:scale-110 transition-transform">
-                add_to_home_screen
-              </span>
-              <span className="hidden sm:inline">단축아이콘</span>
-              <span className="sm:hidden inline">앱설치</span>
-            </button>
-          )}
-
+        <div className="flex items-center gap-2 shrink-0">
           {/* User Account / Role Badge */}
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setDropdownOpen((prev) => !prev)}
-              className={`flex items-center gap-2 py-1.5 px-3 rounded-xl border transition-all text-xs ${
+              className={`flex items-center gap-1.5 sm:gap-2 py-1.5 px-2.5 sm:px-3 rounded-xl border transition-all text-xs shrink-0 ${
                 isAdmin
                   ? 'bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20 text-amber-300'
                   : 'bg-[#12141C] border-[#2A2D35] hover:border-[#3B82F6]/50 hover:bg-[#1A1D26] text-[#E2E4E9]'
               }`}
             >
               {isAdmin ? (
-                <span className="material-symbols-outlined text-[16px] text-amber-400">
+                <span className="material-symbols-outlined text-[15px] sm:text-[16px] text-amber-400 shrink-0">
                   admin_panel_settings
                 </span>
               ) : (
-                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
               )}
 
               <div className="text-left">
-                <span className="font-bold max-w-[90px] sm:max-w-[120px] truncate block leading-tight">
-                  {isAdmin ? '관리자 (Admin)' : userProfile.name}
+                <span className="font-bold max-w-[80px] xs:max-w-[100px] sm:max-w-[120px] truncate block leading-tight text-[11px] sm:text-xs">
+                  {isAdmin ? '관리자' : userProfile.name}
                 </span>
               </div>
 
@@ -177,7 +137,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </span>
               )}
 
-              <span className="material-symbols-outlined text-[16px] opacity-60">
+              <span className="material-symbols-outlined text-[15px] sm:text-[16px] opacity-60 shrink-0">
                 {dropdownOpen ? 'expand_less' : 'expand_more'}
               </span>
             </button>
@@ -208,6 +168,15 @@ export const Header: React.FC<HeaderProps> = ({
                       아이디: {currentUser.username}
                     </div>
                   )}
+                  {/* Real-time Cloud Sync indicator inside dropdown */}
+                  <div className="flex items-center gap-1.5 mt-2 pt-1.5 border-t border-[#2A2D35]/60 text-[10px] text-emerald-400">
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                    </span>
+                    <span className="material-symbols-outlined text-[13px]">cloud_sync</span>
+                    <span>실시간 클라우드 자동 동기화 연결됨</span>
+                  </div>
                 </div>
 
                 {/* If Admin: Quick member selector to monitor */}
@@ -277,19 +246,6 @@ export const Header: React.FC<HeaderProps> = ({
                     <span>설정 및 정보 관리</span>
                   </button>
 
-                  {onOpenInstallModal && (
-                    <button
-                      onClick={() => {
-                        setDropdownOpen(false);
-                        onOpenInstallModal();
-                      }}
-                      className="w-full px-2.5 py-2 rounded-xl text-left flex items-center gap-2 text-xs font-semibold text-[#38BDF8] hover:bg-[#38BDF8]/10 transition-all"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">add_to_home_screen</span>
-                      <span>단축아이콘 등록 (앱 설치)</span>
-                    </button>
-                  )}
-
                   {onLogout && (
                     <button
                       onClick={() => {
@@ -306,15 +262,6 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             )}
           </div>
-
-          {/* Settings quick icon */}
-          <button
-            onClick={onOpenProfile}
-            className="w-9 h-9 flex items-center justify-center rounded-xl bg-[#12141C] border border-[#2A2D35] hover:bg-[#1A1D26] hover:border-[#3E424B] transition-colors duration-200 text-[#9CA3AF] hover:text-[#E2E4E9]"
-            title="설정 및 프로필"
-          >
-            <span className="material-symbols-outlined text-[20px]">settings</span>
-          </button>
         </div>
       </div>
 
